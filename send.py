@@ -26,7 +26,7 @@ smtp_server = "smtp.mxhichina.com"
 msg = MIMEText('来自小悠的通知', 'plain', 'utf-8')
 msg['From'] = _format_addr('小悠 <%s>' % from_addr)
 msg['To'] = _format_addr('管理员 <%s>' % to_addr)
-msg['Subject'] = Header('叮！', 'utf-8').encode()
+msg['Subject'] = Header(f'叮！{to_addr}', 'utf-8').encode()
 
 smtp_port = 587
 server = smtplib.SMTP(smtp_server, smtp_port)
