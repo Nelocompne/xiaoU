@@ -14,7 +14,7 @@ def monitor_disk_simple(mount_point=None, check_interval=5):
     """
     # 设置默认挂载点
     if mount_point is None:
-        mount_point = 'D:\\' if os.name == 'nt' else '/'
+        mount_point = 'C:\\' if os.name == 'nt' else '/'
     
     # 创建输出目录
     output_dir = "str"
