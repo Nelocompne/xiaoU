@@ -27,7 +27,7 @@ def execute_command():
         # Windows 系统的命令示例
         commands = [
             ["echo", "网络已连接！执行命令..."],
-            ["venv\Scripts\python.exe", "send.py"],
+            [".\\venv\\Scripts\\python.exe", "send_pw.py"],
             # 可以添加更多命令，例如：
             # ["dir", "C:\\"],
             # ["ping", "google.com"]
