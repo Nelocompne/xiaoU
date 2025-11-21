@@ -16,7 +16,7 @@ def get_boot_time_simple():
 def save_boot_time(boot_time):
     """保存开机时间到JSON文件"""
     # 创建子文件夹
-    time_dir = "time"
+    time_dir = "str"
     if not os.path.exists(time_dir):
         os.makedirs(time_dir)
     
