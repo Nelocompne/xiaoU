@@ -40,9 +40,9 @@ def get_boot_time_info():
                 return f"""
 系统开机信息:
 ----------------------------
-开机时间: {result['boot_time'].strftime('%Y-%m-%d %H:%M:%S')}
-运行时长: {result['uptime_str']}
-当前时间: {result['current_time'].strftime('%Y-%m-%d %H:%M:%S')}
+📅 开机时间: {result['boot_time'].strftime('%Y-%m-%d %H:%M:%S')}
+⏱️ 运行时长: {result['uptime_str']}
+🕐 当前时间: {result['current_time'].strftime('%Y-%m-%d %H:%M:%S')}
 ----------------------------
 """
             else:
@@ -55,7 +55,7 @@ def get_boot_time_info():
             import json
             from datetime import datetime
             
-            with open("time/date.json", 'r', encoding='utf-8') as f:
+            with open("str/date.json", 'r', encoding='utf-8') as f:
                 data = json.load(f)
             
             boot_time_str = data["boot_time"]
@@ -135,11 +135,9 @@ msg = MIMEText(email_content, 'plain', 'utf-8')
 msg['From'] = _format_addr('小悠 <%s>' % from_addr)
 msg['To'] = _format_addr('管理员 <%s>' % to_addr)
 
-# 在主题中添加脚本启动时间和系统运行时长
-if uptime_days is not None:
-    msg['Subject'] = Header(f'系统状态 - 已运行{uptime_days}天 - 报告时间 {start_time_formatted}', 'utf-8').encode()
-else:
-    msg['Subject'] = Header(f'系统状态报告 - {start_time_formatted}', 'utf-8').encode()
+# 在主题中使用更简洁的时间格式
+short_time_format = script_start_time.strftime("%m-%d %H:%M")
+msg['Subject'] = Header(f'系统状态报告 - {short_time_format}', 'utf-8').encode()
 
 smtp_port = 587
 server = smtplib.SMTP(smtp_server, smtp_port)
