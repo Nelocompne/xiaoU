@@ -1,6 +1,12 @@
 import psutil
 import platform
 
+def _log(message):
+    """统一的日志输出函数"""
+    from datetime import datetime
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{timestamp}] {message}", flush=True)
+
 def check_disk_usage(mount_point=None):
     """
     检查指定挂载点的磁盘使用情况
@@ -31,8 +37,8 @@ def check_disk_usage(mount_point=None):
         
         return total_gb, used_gb, free_gb, percent
     except Exception as e:
-        print(f"检查磁盘使用情况时出错: {e}")
-        print(f"尝试的挂载点: {mount_point}")
+        _log(f"检查磁盘使用情况时出错: {e}")
+        _log(f"尝试的挂载点: {mount_point}")
         return 0, 0, 0, 0
 
 def get_available_drives():
@@ -60,14 +66,14 @@ if __name__ == "__main__":
         drives = get_available_drives()
         for drive in drives:
             total, used, free, percent = check_disk_usage(drive)
-            print(f"驱动器 {drive}:")
-            print(f"  总空间: {total}GB")
-            print(f"  已用空间: {used}GB")
-            print(f"  剩余空间: {free}GB")
-            print(f"  使用率: {percent}%")
+            _log(f"驱动器 {drive}:")
+            _log(f"  总空间: {total}GB")
+            _log(f"  已用空间: {used}GB")
+            _log(f"  剩余空间: {free}GB")
+            _log(f"  使用率: {percent}%")
     else:
         total, used, free, percent = check_disk_usage()
-        print(f"总空间: {total}GB")
-        print(f"已用空间: {used}GB")
-        print(f"剩余空间: {free}GB")
-        print(f"使用率: {percent}%")
+        _log(f"总空间: {total}GB")
+        _log(f"已用空间: {used}GB")
+        _log(f"剩余空间: {free}GB")
+        _log(f"使用率: {percent}%")

@@ -10,6 +10,8 @@
 import time
 import platform
 import threading
+import sys
+import os
 from datetime import datetime, timedelta
 import internet_check
 import system_uptime
@@ -30,6 +32,8 @@ class XiaoUSystem:
         
         self.disk_check_interval = 60  # 磁盘检查间隔（秒）
         self.network_check_interval = 10  # 网络检查间隔（秒）
+        self.status_report_interval = 300  # 状态报告间隔（秒）
+        self.last_status_report = 0
         
         # 根据操作系统设置默认挂载点
         if platform.system() == "Windows":
@@ -37,12 +41,23 @@ class XiaoUSystem:
         else:
             self.mount_point = "/"
         
-        print(f"系统类型: {platform.system()}")
-        print(f"监控的挂载点: {self.mount_point}")
+        self._log(f"系统类型: {platform.system()}")
+        self._log(f"监控的挂载点: {self.mount_point}")
         
+    def _log(self, message):
+        """统一的日志输出函数，确保输出到stdout"""
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"[{timestamp}] {message}", flush=True)
+    
+    def _log_debug(self, message):
+        """调试信息，在systemd中可能不会显示，除非启用调试模式"""
+        # 可以通过环境变量控制是否显示调试信息
+        if os.environ.get('XIAOU_DEBUG'):
+            self._log(f"DEBUG: {message}")
+    
     def run_online_check(self):
         """执行联网检测和上线通知"""
-        print("开始检测网络连接...")
+        self._log("开始检测网络连接...")
         
         while not self.online_notification_sent:
             current_status = internet_check.check_internet_connection()
@@ -52,7 +67,7 @@ class XiaoUSystem:
                 self.last_network_status = current_status
             
             if current_status:
-                print("检测到网络连接成功！")
+                self._log("检测到网络连接成功！")
                 
                 # 获取系统信息
                 boot_time, uptime = system_uptime.get_system_uptime()
@@ -65,9 +80,9 @@ class XiaoUSystem:
                 if email_sender.send_email(title, content):
                     self.online_notification_sent = True
                     self.reconnect_notification_sent = False  # 重置重新联网通知状态
-                    print("上线通知邮件发送成功！")
+                    self._log("上线通知邮件发送成功！")
                 else:
-                    print("上线通知邮件发送失败，将在下次检测时重试")
+                    self._log("上线通知邮件发送失败，将在下次检测时重试")
             
             # 更新网络状态
             self.last_network_status = current_status
@@ -77,7 +92,7 @@ class XiaoUSystem:
     
     def run_network_monitor(self):
         """持续监控网络状态，检测断网重连情况"""
-        print("网络监控线程启动 - 持续监控网络状态")
+        self._log("网络监控线程启动 - 持续监控网络状态")
         
         while True:
             try:
@@ -90,7 +105,7 @@ class XiaoUSystem:
                     self.online_notification_sent and
                     not self.reconnect_notification_sent):
                     
-                    print("检测到网络重新连接！")
+                    self._log("检测到网络重新连接！")
                     
                     # 编写邮件内容
                     title = email_composer.format_title("小悠已重新联网")
@@ -99,27 +114,34 @@ class XiaoUSystem:
                     # 发送邮件
                     if email_sender.send_email(title, content):
                         self.reconnect_notification_sent = True
-                        print("重新联网通知邮件发送成功！")
+                        self._log("重新联网通知邮件发送成功！")
                     else:
-                        print("重新联网通知邮件发送失败")
+                        self._log("重新联网通知邮件发送失败")
                 
                 # 如果网络断开，重置重新联网通知状态
                 if not current_status and self.reconnect_notification_sent:
                     self.reconnect_notification_sent = False
-                    print("网络连接已断开")
+                    self._log_debug("网络连接已断开")
                 
                 # 更新网络状态
                 self.last_network_status = current_status
                 
+                # 定期报告网络状态
+                current_time = time.time()
+                if current_time - self.last_status_report > self.status_report_interval:
+                    status_text = "在线" if current_status else "离线"
+                    self._log_debug(f"网络状态: {status_text}")
+                    self.last_status_report = current_time
+                
             except Exception as e:
-                print(f"网络状态监控出错: {e}")
+                self._log(f"网络状态监控出错: {e}")
             
             # 等待指定间隔后再次检查
             time.sleep(self.network_check_interval)
     
     def run_disk_monitor(self):
         """独立执行磁盘空间监控 - 多级预警机制"""
-        print("磁盘监控线程启动 - 多级预警机制已启用")
+        self._log("磁盘监控线程启动 - 多级预警机制已启用")
         
         while True:
             try:
@@ -128,11 +150,11 @@ class XiaoUSystem:
                 
                 # 如果获取数据失败，跳过本次检查
                 if total_gb == 0 and used_gb == 0 and free_gb == 0:
-                    print("无法获取磁盘使用信息，等待下次检查...")
+                    self._log_debug("无法获取磁盘使用信息，等待下次检查...")
                     time.sleep(self.disk_check_interval)
                     continue
                 
-                print(f"磁盘状态: {free_gb}GB 剩余 ({percent}% 已使用)")
+                self._log_debug(f"磁盘状态: {free_gb}GB 剩余 ({percent}% 已使用)")
                 
                 current_time = datetime.now()
                 should_send = False
@@ -150,7 +172,7 @@ class XiaoUSystem:
                             self.mount_point, total_gb, used_gb, free_gb, percent
                         )
                         if should_send:
-                            print("检测到磁盘空间极度不足（<1GB），准备发送紧急警告邮件...")
+                            self._log("检测到磁盘空间极度不足（<1GB），准备发送紧急警告邮件...")
                 
                 elif free_gb < 30:
                     # 级别2: 剩余容量低于30GB但大于1GB - 中等紧急级别
@@ -162,7 +184,7 @@ class XiaoUSystem:
                             self.mount_point, total_gb, used_gb, free_gb, percent
                         )
                         if should_send:
-                            print("检测到磁盘空间严重不足（<30GB），准备发送严重警告邮件...")
+                            self._log("检测到磁盘空间严重不足（<30GB），准备发送严重警告邮件...")
                 
                 elif free_gb < 100:
                     # 级别1: 剩余容量低于100GB但大于30GB - 一般警告级别
@@ -174,9 +196,9 @@ class XiaoUSystem:
                             self.mount_point, total_gb, used_gb, free_gb, percent
                         )
                         if should_send:
-                            print("检测到磁盘空间不足（<100GB），准备发送警告邮件...")
+                            self._log("检测到磁盘空间不足（<100GB），准备发送警告邮件...")
                 else:
-                    print("磁盘空间充足")
+                    self._log_debug("磁盘空间充足")
                 
                 # 发送邮件并更新最后发送时间
                 if should_send:
@@ -187,12 +209,12 @@ class XiaoUSystem:
                             self.last_disk_warning_time_30gb = current_time
                         else:  # free_gb < 100
                             self.last_disk_warning_time_100gb = current_time
-                        print("磁盘空间警告邮件发送成功！")
+                        self._log("磁盘空间警告邮件发送成功！")
                     else:
-                        print("磁盘空间警告邮件发送失败")
+                        self._log("磁盘空间警告邮件发送失败")
                 
             except Exception as e:
-                print(f"磁盘监控出错: {e}")
+                self._log(f"磁盘监控出错: {e}")
             
             # 等待指定间隔后再次检查
             time.sleep(self.disk_check_interval)
@@ -213,22 +235,22 @@ class XiaoUSystem:
     
     def run(self):
         """主运行函数"""
-        print("小悠系统监控启动中...")
-        print("=" * 50)
+        self._log("小悠系统监控启动中...")
+        self._log("=" * 50)
         
         # 显示系统信息
-        print(f"操作系统: {platform.system()} {platform.release()}")
-        print(f"Python版本: {platform.python_version()}")
+        self._log(f"操作系统: {platform.system()} {platform.release()}")
+        self._log(f"Python版本: {platform.python_version()}")
         
         # 立即启动磁盘监控线程（不等待网络检测）
-        print("启动独立磁盘监控线程...")
+        self._log("启动独立磁盘监控线程...")
         disk_thread = self.start_disk_monitor_thread()
         
         # 启动联网检测（阻塞，直到首次联网成功发送通知）
         self.run_online_check()
         
-        print("=" * 50)
-        print("上线通知已完成，启动持续网络监控线程...")
+        self._log("=" * 50)
+        self._log("上线通知已完成，启动持续网络监控线程...")
         
         # 启动网络状态监控线程
         network_thread = self.start_network_monitor_thread()
@@ -238,20 +260,20 @@ class XiaoUSystem:
             while True:
                 # 检查线程状态
                 if not disk_thread.is_alive():
-                    print("磁盘监控线程已停止，重新启动...")
+                    self._log("磁盘监控线程已停止，重新启动...")
                     disk_thread = self.start_disk_monitor_thread()
                 
                 if not network_thread.is_alive():
-                    print("网络监控线程已停止，重新启动...")
+                    self._log("网络监控线程已停止，重新启动...")
                     network_thread = self.start_network_monitor_thread()
                 
                 # 主线程休眠，减少CPU占用
                 time.sleep(10)
                 
         except KeyboardInterrupt:
-            print("程序被用户中断")
+            self._log("程序被用户中断")
         except Exception as e:
-            print(f"程序运行出错: {e}")
+            self._log(f"程序运行出错: {e}")
 
 if __name__ == "__main__":
     xiao_u = XiaoUSystem()

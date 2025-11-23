@@ -1,0 +1,17 @@
+[Unit]
+Description=XiaoU System Monitor
+After=network.target
+
+[Service]
+Type=simple
+User=your_username
+Group=your_group
+WorkingDirectory=/path/to/xiaoU_project
+Environment=PYTHONUNBUFFERED=1
+Environment=XIAOU_DEBUG=0
+ExecStart=/path/to/python /path/to/xiaoU_project/xiaoU.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
