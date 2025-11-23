@@ -13,11 +13,15 @@ import threading
 import sys
 import os
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
 import internet_check
 import system_uptime
 import disk_usage
 import email_sender
 from email_composer import email_composer
+
+# 加载环境变量
+load_dotenv()
 
 class XiaoUSystem:
     def __init__(self):
@@ -35,14 +39,19 @@ class XiaoUSystem:
         self.status_report_interval = 300  # 状态报告间隔（秒）
         self.last_status_report = 0
         
-        # 根据操作系统设置默认挂载点
-        if platform.system() == "Windows":
-            self.mount_point = "C:\\"
+        # 从环境变量读取挂载点，如果没有设置则使用默认值
+        self.mount_point = os.environ.get('ENV_MOUNT_POINT')
+        if not self.mount_point:
+            # 根据操作系统设置默认挂载点
+            if platform.system() == "Windows":
+                self.mount_point = "C:\\"
+            else:
+                self.mount_point = "/"
+            self._log(f"未设置 ENV_MOUNT_POINT 环境变量，使用默认挂载点: {self.mount_point}")
         else:
-            self.mount_point = "/"
+            self._log(f"使用环境变量指定的挂载点: {self.mount_point}")
         
         self._log(f"系统类型: {platform.system()}")
-        self._log(f"监控的挂载点: {self.mount_point}")
         
     def _log(self, message):
         """统一的日志输出函数，确保输出到stdout"""
