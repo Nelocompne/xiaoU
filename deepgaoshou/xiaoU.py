@@ -4,11 +4,12 @@
 功能：
 1. 首次联网成功后发送上线通知
 2. 持续监控网络状态，断网重连后发送重新联网通知
-3. 持续监控磁盘空间，空间不足时发送警告（每180分钟一次）
+3. 独立持续监控磁盘空间，空间不足时发送警告（每180分钟一次）
 """
 
 import time
 import platform
+import threading
 from datetime import datetime, timedelta
 import internet_check
 import system_uptime
@@ -71,7 +72,7 @@ class XiaoUSystem:
     
     def run_network_monitor(self):
         """持续监控网络状态，检测断网重连情况"""
-        print("开始持续网络状态监控...")
+        print("网络监控线程启动 - 持续监控网络状态")
         
         while True:
             try:
@@ -112,8 +113,8 @@ class XiaoUSystem:
             time.sleep(self.network_check_interval)
     
     def run_disk_monitor(self):
-        """执行磁盘空间监控"""
-        print("开始磁盘空间监控...")
+        """独立执行磁盘空间监控"""
+        print("磁盘监控线程启动 - 独立持续监控磁盘空间")
         
         while True:
             try:
@@ -165,6 +166,20 @@ class XiaoUSystem:
             # 等待指定间隔后再次检查
             time.sleep(self.disk_check_interval)
     
+    def start_disk_monitor_thread(self):
+        """启动磁盘监控线程"""
+        disk_thread = threading.Thread(target=self.run_disk_monitor)
+        disk_thread.daemon = True  # 设置为守护线程，主程序退出时自动结束
+        disk_thread.start()
+        return disk_thread
+    
+    def start_network_monitor_thread(self):
+        """启动网络监控线程"""
+        network_thread = threading.Thread(target=self.run_network_monitor)
+        network_thread.daemon = True  # 设置为守护线程，主程序退出时自动结束
+        network_thread.start()
+        return network_thread
+    
     def run(self):
         """主运行函数"""
         print("小悠系统监控启动中...")
@@ -174,25 +189,33 @@ class XiaoUSystem:
         print(f"操作系统: {platform.system()} {platform.release()}")
         print(f"Python版本: {platform.python_version()}")
         
+        # 立即启动磁盘监控线程（不等待网络检测）
+        print("启动独立磁盘监控线程...")
+        disk_thread = self.start_disk_monitor_thread()
+        
         # 启动联网检测（阻塞，直到首次联网成功发送通知）
         self.run_online_check()
         
         print("=" * 50)
-        print("上线通知已完成，开始持续网络和磁盘监控...")
+        print("上线通知已完成，启动持续网络监控线程...")
         
-        # 启动网络状态监控（持续运行）
-        # 注意：由于Python的GIL限制，这里使用简单的循环而非真正的并行
-        # 在实际应用中，可以考虑使用多线程或异步编程
+        # 启动网络状态监控线程
+        network_thread = self.start_network_monitor_thread()
+        
+        # 主线程保持运行，等待所有子线程
         try:
             while True:
-                # 运行网络监控
-                self.run_network_monitor()
+                # 检查线程状态
+                if not disk_thread.is_alive():
+                    print("磁盘监控线程已停止，重新启动...")
+                    disk_thread = self.start_disk_monitor_thread()
                 
-                # 运行磁盘监控
-                self.run_disk_monitor()
+                if not network_thread.is_alive():
+                    print("网络监控线程已停止，重新启动...")
+                    network_thread = self.start_network_monitor_thread()
                 
-                # 短暂休眠避免过度占用CPU
-                time.sleep(1)
+                # 主线程休眠，减少CPU占用
+                time.sleep(10)
                 
         except KeyboardInterrupt:
             print("程序被用户中断")
