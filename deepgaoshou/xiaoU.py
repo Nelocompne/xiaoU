@@ -7,6 +7,7 @@
 """
 
 import time
+import platform
 from datetime import datetime, timedelta
 import internet_check
 import system_uptime
@@ -19,7 +20,15 @@ class XiaoUSystem:
         self.online_notification_sent = False
         self.last_disk_warning_time = None
         self.disk_check_interval = 300  # 磁盘检查间隔（秒）
-        self.mount_point = "/"  # 监控的挂载点，可根据需要修改
+        
+        # 根据操作系统设置默认挂载点
+        if platform.system() == "Windows":
+            self.mount_point = "C:\\"
+        else:
+            self.mount_point = "/"
+        
+        print(f"系统类型: {platform.system()}")
+        print(f"监控的挂载点: {self.mount_point}")
         
     def run_online_check(self):
         """执行联网检测和上线通知"""
@@ -55,6 +64,12 @@ class XiaoUSystem:
                 # 检查磁盘使用情况
                 total_gb, used_gb, free_gb, percent = disk_usage.check_disk_usage(self.mount_point)
                 
+                # 如果获取数据失败，跳过本次检查
+                if total_gb == 0 and used_gb == 0 and free_gb == 0:
+                    print("无法获取磁盘使用信息，等待下次检查...")
+                    time.sleep(self.disk_check_interval)
+                    continue
+                
                 print(f"磁盘状态: {free_gb}GB 剩余 ({percent}% 已使用)")
                 
                 # 检查是否低于90GB阈值
@@ -85,6 +100,8 @@ class XiaoUSystem:
                             print("磁盘空间警告邮件发送成功！")
                         else:
                             print("磁盘空间警告邮件发送失败")
+                else:
+                    print("磁盘空间充足")
                 
             except Exception as e:
                 print(f"磁盘监控出错: {e}")
@@ -96,6 +113,10 @@ class XiaoUSystem:
         """主运行函数"""
         print("小悠系统监控启动中...")
         print("=" * 50)
+        
+        # 显示系统信息
+        print(f"操作系统: {platform.system()} {platform.release()}")
+        print(f"Python版本: {platform.python_version()}")
         
         # 启动联网检测（阻塞，直到首次联网成功发送通知）
         self.run_online_check()
