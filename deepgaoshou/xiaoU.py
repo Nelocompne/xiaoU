@@ -4,7 +4,7 @@
 功能：
 1. 首次联网成功后发送上线通知
 2. 持续监控网络状态，断网重连后发送重新联网通知
-3. 独立持续监控磁盘空间，空间不足时发送警告（每180分钟一次）
+3. 独立持续监控磁盘空间，根据剩余空间设置多级预警机制
 """
 
 import time
@@ -22,8 +22,13 @@ class XiaoUSystem:
         self.online_notification_sent = False
         self.reconnect_notification_sent = False
         self.last_network_status = None  # 记录上一次网络状态
-        self.last_disk_warning_time = None
-        self.disk_check_interval = 300  # 磁盘检查间隔（秒）
+        
+        # 磁盘监控相关变量
+        self.last_disk_warning_time_100gb = None  # 100GB阈值警告最后发送时间
+        self.last_disk_warning_time_30gb = None   # 30GB阈值警告最后发送时间
+        self.last_disk_warning_time_1gb = None    # 1GB阈值警告最后发送时间
+        
+        self.disk_check_interval = 60  # 磁盘检查间隔（秒）
         self.network_check_interval = 10  # 网络检查间隔（秒）
         
         # 根据操作系统设置默认挂载点
@@ -113,8 +118,8 @@ class XiaoUSystem:
             time.sleep(self.network_check_interval)
     
     def run_disk_monitor(self):
-        """独立执行磁盘空间监控"""
-        print("磁盘监控线程启动 - 独立持续监控磁盘空间")
+        """独立执行磁盘空间监控 - 多级预警机制"""
+        print("磁盘监控线程启动 - 多级预警机制已启用")
         
         while True:
             try:
@@ -129,36 +134,62 @@ class XiaoUSystem:
                 
                 print(f"磁盘状态: {free_gb}GB 剩余 ({percent}% 已使用)")
                 
-                # 检查是否低于90GB阈值
-                if free_gb < 90:
-                    current_time = datetime.now()
-                    
-                    # 检查是否满足发送间隔（180分钟）
-                    should_send = False
-                    if self.last_disk_warning_time is None:
+                current_time = datetime.now()
+                should_send = False
+                title = ""
+                content = ""
+                
+                # 多级预警机制
+                if free_gb < 1:
+                    # 级别3: 剩余容量低于1GB - 最高紧急级别
+                    if (self.last_disk_warning_time_1gb is None or 
+                        current_time - self.last_disk_warning_time_1gb >= timedelta(minutes=10)):
                         should_send = True
-                    else:
-                        time_diff = current_time - self.last_disk_warning_time
-                        if time_diff >= timedelta(minutes=180):
-                            should_send = True
-                    
-                    if should_send:
-                        print("检测到磁盘空间不足，准备发送警告邮件...")
-                        
-                        # 编写邮件内容
-                        title = email_composer.format_title("小悠提醒你空间不够了！")
-                        content = email_composer.compose_disk_warning(
+                        title = email_composer.format_title("小悠的里面...好多❤")
+                        content = email_composer.compose_disk_warning_high(
                             self.mount_point, total_gb, used_gb, free_gb, percent
                         )
-                        
-                        # 发送邮件
-                        if email_sender.send_email(title, content):
-                            self.last_disk_warning_time = current_time
-                            print("磁盘空间警告邮件发送成功！")
-                        else:
-                            print("磁盘空间警告邮件发送失败")
+                        if should_send:
+                            print("检测到磁盘空间极度不足（<1GB），准备发送紧急警告邮件...")
+                
+                elif free_gb < 30:
+                    # 级别2: 剩余容量低于30GB但大于1GB - 中等紧急级别
+                    if (self.last_disk_warning_time_30gb is None or 
+                        current_time - self.last_disk_warning_time_30gb >= timedelta(minutes=20)):
+                        should_send = True
+                        title = email_composer.format_title("小悠要被灌满了~~")
+                        content = email_composer.compose_disk_warning_medium(
+                            self.mount_point, total_gb, used_gb, free_gb, percent
+                        )
+                        if should_send:
+                            print("检测到磁盘空间严重不足（<30GB），准备发送严重警告邮件...")
+                
+                elif free_gb < 100:
+                    # 级别1: 剩余容量低于100GB但大于30GB - 一般警告级别
+                    if (self.last_disk_warning_time_100gb is None or 
+                        current_time - self.last_disk_warning_time_100gb >= timedelta(minutes=90)):
+                        should_send = True
+                        title = email_composer.format_title("小悠提醒你空间不够了！")
+                        content = email_composer.compose_disk_warning_low(
+                            self.mount_point, total_gb, used_gb, free_gb, percent
+                        )
+                        if should_send:
+                            print("检测到磁盘空间不足（<100GB），准备发送警告邮件...")
                 else:
                     print("磁盘空间充足")
+                
+                # 发送邮件并更新最后发送时间
+                if should_send:
+                    if email_sender.send_email(title, content):
+                        if free_gb < 1:
+                            self.last_disk_warning_time_1gb = current_time
+                        elif free_gb < 30:
+                            self.last_disk_warning_time_30gb = current_time
+                        else:  # free_gb < 100
+                            self.last_disk_warning_time_100gb = current_time
+                        print("磁盘空间警告邮件发送成功！")
+                    else:
+                        print("磁盘空间警告邮件发送失败")
                 
             except Exception as e:
                 print(f"磁盘监控出错: {e}")

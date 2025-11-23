@@ -72,12 +72,12 @@ class EmailComposer:
 -- 自动发送于 {current_time}"""
         return content
     
-    def compose_disk_warning(self, mount_point, total_gb, used_gb, free_gb, percent):
+    def compose_disk_warning_low(self, mount_point, total_gb, used_gb, free_gb, percent):
         """
-        编写磁盘空间警告邮件内容
+        编写低级别磁盘空间警告邮件内容（100GB > 剩余 > 30GB）
         """
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        content = f"""磁盘空间警告
+        content = f"""磁盘空间提醒
 
 系统检测到磁盘空间不足：
 • 挂载点：{mount_point}
@@ -85,7 +85,43 @@ class EmailComposer:
 • 已使用：{used_gb} GB ({percent}%)
 • 剩余空间：{free_gb} GB
 
-请注意及时清理磁盘空间，避免系统运行受到影响。
+请注意及时清理磁盘空间，避免影响系统运行。
+
+-- 自动发送于 {current_time}"""
+        return content
+    
+    def compose_disk_warning_medium(self, mount_point, total_gb, used_gb, free_gb, percent):
+        """
+        编写中级别磁盘空间警告邮件内容（30GB > 剩余 > 1GB）
+        """
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        content = f"""磁盘空间严重警告
+
+系统检测到磁盘空间严重不足：
+• 挂载点：{mount_point}
+• 总空间：{total_gb} GB
+• 已使用：{used_gb} GB ({percent}%)
+• 剩余空间：{free_gb} GB
+
+请立即清理磁盘空间，系统运行可能受到影响！
+
+-- 自动发送于 {current_time}"""
+        return content
+    
+    def compose_disk_warning_high(self, mount_point, total_gb, used_gb, free_gb, percent):
+        """
+        编写高级别磁盘空间警告邮件内容（剩余 < 1GB）
+        """
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        content = f"""磁盘空间紧急警告
+
+系统检测到磁盘空间极度不足：
+• 挂载点：{mount_point}
+• 总空间：{total_gb} GB
+• 已使用：{used_gb} GB ({percent}%)
+• 剩余空间：{free_gb} GB
+
+请立即清理磁盘空间，系统运行即将受到严重影响！
 
 -- 自动发送于 {current_time}"""
         return content
