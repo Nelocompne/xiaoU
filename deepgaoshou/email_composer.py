@@ -55,6 +55,23 @@ class EmailComposer:
 -- 自动发送于 {current_time}"""
         return content
     
+    def compose_reconnect_notification(self):
+        """
+        编写重新联网通知邮件内容
+        """
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        content = f"""小悠重新联网通知
+
+网络状态报告：
+• 当前时间：{current_time}
+• 事件：网络连接已恢复
+
+系统检测到网络连接从断开状态恢复。
+小悠继续为您服务！❤
+
+-- 自动发送于 {current_time}"""
+        return content
+    
     def compose_disk_warning(self, mount_point, total_gb, used_gb, free_gb, percent):
         """
         编写磁盘空间警告邮件内容

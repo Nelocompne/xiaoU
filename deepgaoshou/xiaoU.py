@@ -3,7 +3,8 @@
 小悠系统监控主程序
 功能：
 1. 首次联网成功后发送上线通知
-2. 持续监控磁盘空间，空间不足时发送警告（每180分钟一次）
+2. 持续监控网络状态，断网重连后发送重新联网通知
+3. 持续监控磁盘空间，空间不足时发送警告（每180分钟一次）
 """
 
 import time
@@ -18,8 +19,11 @@ from email_composer import email_composer
 class XiaoUSystem:
     def __init__(self):
         self.online_notification_sent = False
+        self.reconnect_notification_sent = False
+        self.last_network_status = None  # 记录上一次网络状态
         self.last_disk_warning_time = None
         self.disk_check_interval = 300  # 磁盘检查间隔（秒）
+        self.network_check_interval = 10  # 网络检查间隔（秒）
         
         # 根据操作系统设置默认挂载点
         if platform.system() == "Windows":
@@ -35,7 +39,13 @@ class XiaoUSystem:
         print("开始检测网络连接...")
         
         while not self.online_notification_sent:
-            if internet_check.check_internet_connection():
+            current_status = internet_check.check_internet_connection()
+            
+            # 记录初始网络状态
+            if self.last_network_status is None:
+                self.last_network_status = current_status
+            
+            if current_status:
                 print("检测到网络连接成功！")
                 
                 # 获取系统信息
@@ -48,12 +58,58 @@ class XiaoUSystem:
                 # 发送邮件
                 if email_sender.send_email(title, content):
                     self.online_notification_sent = True
+                    self.reconnect_notification_sent = False  # 重置重新联网通知状态
                     print("上线通知邮件发送成功！")
                 else:
                     print("上线通知邮件发送失败，将在下次检测时重试")
             
+            # 更新网络状态
+            self.last_network_status = current_status
+            
             # 等待5秒后再次检测
             time.sleep(5)
+    
+    def run_network_monitor(self):
+        """持续监控网络状态，检测断网重连情况"""
+        print("开始持续网络状态监控...")
+        
+        while True:
+            try:
+                current_status = internet_check.check_internet_connection()
+                
+                # 检测网络状态变化：从断网到联网
+                if (self.last_network_status is not None and 
+                    not self.last_network_status and 
+                    current_status and 
+                    self.online_notification_sent and
+                    not self.reconnect_notification_sent):
+                    
+                    print("检测到网络重新连接！")
+                    
+                    # 编写邮件内容
+                    title = email_composer.format_title("小悠已重新联网")
+                    content = email_composer.compose_reconnect_notification()
+                    
+                    # 发送邮件
+                    if email_sender.send_email(title, content):
+                        self.reconnect_notification_sent = True
+                        print("重新联网通知邮件发送成功！")
+                    else:
+                        print("重新联网通知邮件发送失败")
+                
+                # 如果网络断开，重置重新联网通知状态
+                if not current_status and self.reconnect_notification_sent:
+                    self.reconnect_notification_sent = False
+                    print("网络连接已断开")
+                
+                # 更新网络状态
+                self.last_network_status = current_status
+                
+            except Exception as e:
+                print(f"网络状态监控出错: {e}")
+            
+            # 等待指定间隔后再次检查
+            time.sleep(self.network_check_interval)
     
     def run_disk_monitor(self):
         """执行磁盘空间监控"""
@@ -122,10 +178,26 @@ class XiaoUSystem:
         self.run_online_check()
         
         print("=" * 50)
-        print("上线通知已完成，开始持续磁盘监控...")
+        print("上线通知已完成，开始持续网络和磁盘监控...")
         
-        # 启动磁盘监控（持续运行）
-        self.run_disk_monitor()
+        # 启动网络状态监控（持续运行）
+        # 注意：由于Python的GIL限制，这里使用简单的循环而非真正的并行
+        # 在实际应用中，可以考虑使用多线程或异步编程
+        try:
+            while True:
+                # 运行网络监控
+                self.run_network_monitor()
+                
+                # 运行磁盘监控
+                self.run_disk_monitor()
+                
+                # 短暂休眠避免过度占用CPU
+                time.sleep(1)
+                
+        except KeyboardInterrupt:
+            print("程序被用户中断")
+        except Exception as e:
+            print(f"程序运行出错: {e}")
 
 if __name__ == "__main__":
     xiao_u = XiaoUSystem()
