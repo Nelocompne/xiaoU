@@ -69,14 +69,15 @@ class XiaoUSystem:
         self._log("开始检测网络连接...")
         
         while not self.online_notification_sent:
-            current_status = internet_check.check_internet_connection()
+            # 使用详细网络检测功能
+            current_status, details = internet_check.check_internet_connection_with_details()
             
             # 记录初始网络状态
             if self.last_network_status is None:
                 self.last_network_status = current_status
             
             if current_status:
-                self._log("检测到网络连接成功！")
+                self._log(f"检测到网络连接成功！{details}")
                 
                 # 获取系统信息
                 boot_time, uptime = system_uptime.get_system_uptime()
@@ -92,6 +93,8 @@ class XiaoUSystem:
                     self._log("上线通知邮件发送成功！")
                 else:
                     self._log("上线通知邮件发送失败，将在下次检测时重试")
+            else:
+                self._log_debug(f"网络连接失败: {details}")
             
             # 更新网络状态
             self.last_network_status = current_status
@@ -105,7 +108,8 @@ class XiaoUSystem:
         
         while True:
             try:
-                current_status = internet_check.check_internet_connection()
+                # 使用详细网络检测功能
+                current_status, details = internet_check.check_internet_connection_with_details()
                 
                 # 检测网络状态变化：从断网到联网
                 if (self.last_network_status is not None and 
@@ -114,7 +118,7 @@ class XiaoUSystem:
                     self.online_notification_sent and
                     not self.reconnect_notification_sent):
                     
-                    self._log("检测到网络重新连接！")
+                    self._log(f"检测到网络重新连接！{details}")
                     
                     # 编写邮件内容
                     title = email_composer.format_title("小悠已重新联网")
@@ -130,7 +134,7 @@ class XiaoUSystem:
                 # 如果网络断开，重置重新联网通知状态
                 if not current_status and self.reconnect_notification_sent:
                     self.reconnect_notification_sent = False
-                    self._log_debug("网络连接已断开")
+                    self._log_debug(f"网络连接已断开: {details}")
                 
                 # 更新网络状态
                 self.last_network_status = current_status
@@ -139,7 +143,7 @@ class XiaoUSystem:
                 current_time = time.time()
                 if current_time - self.last_status_report > self.status_report_interval:
                     status_text = "在线" if current_status else "离线"
-                    self._log_debug(f"网络状态: {status_text}")
+                    self._log_debug(f"网络状态: {status_text} - {details}")
                     self.last_status_report = current_time
                 
             except Exception as e:
