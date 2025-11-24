@@ -57,9 +57,9 @@ def check_internet_connection_with_details(hosts=None, timeout=5):
     if hosts is None:
         # 默认的备选host列表
         hosts = [
-            "8.8.8.8",           # Google DNS
+            "211.141.85.68",     # 移动DNS
+            "211.141.90.68",     # 移动备选DNS
             "1.1.1.1",           # Cloudflare DNS
-            "208.67.222.222",    # OpenDNS
             "223.5.5.5",         # 阿里云DNS
             "114.114.114.114"    # 114DNS
         ]
